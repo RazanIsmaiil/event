@@ -9,6 +9,10 @@ import About from "./pages/About";
 import Events from "./pages/Events";
 import EventDetails from "./pages/EventDetails";
 import Contact from "./pages/Contact";
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+
+
 
 function App() {
   return (
@@ -21,6 +25,8 @@ function App() {
         <Route path="/events" element={<Events />} />
         <Route path="/events/:id" element={<EventDetails />} />
         <Route path="/contact" element={<Contact />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />  
       </Routes>
 
       <Footer />

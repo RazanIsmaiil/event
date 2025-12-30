@@ -29,12 +29,16 @@ const db = mysql.createPool({
   port: process.env.MYSQL_PORT,
 });
 
-
-
-db.connect((err) => {
-  if (err) console.log("DB Error");
-  else console.log("DB Connected");
+db.getConnection((err, conn) => {
+  if (err) {
+    console.error("DB Error:", err.message);
+    return;
+  }
+  console.log("DB Connected (pool test)");
+  conn.release();
 });
+
+
 
 
 app.get("/events", (req, res) => {

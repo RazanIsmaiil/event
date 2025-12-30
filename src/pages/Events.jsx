@@ -27,21 +27,24 @@ const Events = () => {
   };
 
  
-  const addEvent = () => {
-    if (!state.title || !state.description || !state.date || !state.location) {
-      alert("All fields are required");
-      return;
-    }
+ const addEvent = async () => {
+  if (!state.title || !state.description || !state.date || !state.location) {
+    alert("All fields are required");
+    return;
+  }
 
-    axios
-      .post(`${API}/events`, state)
-      .then((res) => {
-        alert("Event added successfully");
-        setEvents([...events, { ...state, id: Math.random() }]); 
-        setState({ title: "", description: "", date: "", location: "" }); 
-      })
-      .catch((err) => console.log(err));
-  };
+  try {
+    await axios.post(`${API}/events`, state);
+    const refreshed = await axios.get(`${API}/events`);
+    setEvents(refreshed.data);
+    setState({ title: "", description: "", date: "", location: "" });
+    alert("Event added successfully");
+  } catch (err) {
+    console.log(err);
+    alert(err?.response?.data?.error || err?.response?.data || "Failed to add event");
+  }
+};
+
 
 
   const remove = (id) => {

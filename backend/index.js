@@ -1,153 +1,170 @@
 import express from "express";
-import mysql from "mysql";
 import cors from "cors";
+import mysql from "mysql2/promise";
 import bcrypt from "bcrypt";
 import dotenv from "dotenv";
 
 dotenv.config();
+
 const app = express();
-app.use(cors());
+
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+  })
+);
+
 app.use(express.json());
 
-const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
-
-
-
-
-dotenv.config();
-
-const db = mysql.createPool({
+const pool = mysql.createPool({
+  host: process.env.MYSQL_HOST || "localhost",
+  user: process.env.MYSQL_USER || "root",
+  password: process.env.MYSQL_PASSWORD || "",
+  database: process.env.MYSQL_DATABASE || "eventdb",
+  port: Number(process.env.MYSQL_PORT || 3306),
+  waitForConnections: true,
   connectionLimit: 10,
-  host: process.env.MYSQL_HOST,
-  user: process.env.MYSQL_USER,
-  password: process.env.MYSQL_PASSWORD,
-  database: process.env.MYSQL_DATABASE,
-  port: process.env.MYSQL_PORT,
-});
-
-db.getConnection((err, conn) => {
-  if (err) {
-    console.error("DB Error:", err.message);
-    return;
-  }
-  console.log("DB Connected (pool test)");
-  conn.release();
 });
 
 
-
-
-app.get("/events", (req, res) => {
-  db.query("SELECT * FROM events", (err, data) => {
-    if (err) return res.status(500).json(err);
-    res.status(200).json(data);
-  });
-});
 app.get("/", (req, res) => {
   res.send("Backend is running 🚀");
 });
 
 
-
-app.get("/events/:id", (req, res) => {
-  const q = "SELECT * FROM events WHERE id = ?";
-  db.query(q, [req.params.id], (err, data) => {
-    if (err) return res.status(500).json(err);
-    if (data.length === 0) return res.status(404).send("Event not found");
-    res.status(200).json(data[0]);
-  });
+app.get("/events", async (req, res) => {
+  try {
+    const [rows] = await pool.query("SELECT * FROM events");
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
 });
 
+app.get("/events/:id", async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      "SELECT * FROM events WHERE id = ?",
+      [req.params.id]
+    );
 
-app.post("/events", (req, res) => {
-  const { title, description, date, location } = req.body;
-  if (!title || !description || !date || !location)
-    return res.status(400).send("All fields required");
+    if (rows.length === 0)
+      return res.status(404).send("Event not found");
 
-  const q =
-    "INSERT INTO events (title, description, date, location) VALUES (?, ?, ?, ?)";
-  db.query(q, [title, description, date, location], (err, data) => {
-    if (err) return res.status(500).json(err);
-    res.status(201).json(data);
-  });
+    res.json(rows[0]);
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
 });
 
+app.post("/events", async (req, res) => {
+  try {
+    const { title, description, date, location } = req.body;
 
-app.put("/events/:id", (req, res) => {
-  const { title, description, date, location } = req.body;
-  const q =
-    "UPDATE events SET title=?, description=?, date=?, location=? WHERE id=?";
-  db.query(
-    q,
-    [title, description, date, location, req.params.id],
-    (err, data) => {
-      if (err) return res.status(500).json(err);
-      if (data.affectedRows === 0) return res.status(404).send("Event not found");
-      res.status(200).send("Event updated successfully");
-    }
-  );
+    if (!title || !description || !date || !location)
+      return res.status(400).send("All fields required");
+
+    const [result] = await pool.query(
+      "INSERT INTO events (title, description, date, location) VALUES (?, ?, ?, ?)",
+      [title, description, date, location]
+    );
+
+    res.status(201).json({ id: result.insertId });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
 });
 
+app.put("/events/:id", async (req, res) => {
+  try {
+    const { title, description, date, location } = req.body;
 
-app.delete("/events/:id", (req, res) => {
-  const q = "DELETE FROM events WHERE id=?";
-  db.query(q, [req.params.id], (err, data) => {
-    if (err) return res.status(500).json(err);
-    if (data.affectedRows === 0) return res.status(404).send("Event not found");
-    res.status(200).send("Event deleted successfully");
-  });
+    const [result] = await pool.query(
+      "UPDATE events SET title=?, description=?, date=?, location=? WHERE id=?",
+      [title, description, date, location, req.params.id]
+    );
+
+    if (result.affectedRows === 0)
+      return res.status(404).send("Event not found");
+
+    res.send("Event updated successfully");
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
 });
 
-app.post("/signup", (req, res) => {
-  const { name, email, password } = req.body;
+app.delete("/events/:id", async (req, res) => {
+  try {
+    const [result] = await pool.query(
+      "DELETE FROM events WHERE id = ?",
+      [req.params.id]
+    );
 
-  if (!name || !email || !password)
-    return res.status(400).send("All fields are required");
+    if (result.affectedRows === 0)
+      return res.status(404).send("Event not found");
 
-  const hashedPassword = bcrypt.hashSync(password, 10);
+    res.send("Event deleted successfully");
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+});
 
-  const q =
-    "INSERT INTO users (name, email, password) VALUES (?, ?, ?)";
+// AUTH
+app.post("/signup", async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
 
-  db.query(q, [name, email, hashedPassword], (err) => {
-    if (err) {
-      if (err.errno === 1062)
-        return res.status(400).send("Email already exists");
-      return res.status(500).json(err);
-    }
+    if (!name || !email || !password)
+      return res.status(400).send("All fields are required");
+
+    const hashedPassword = bcrypt.hashSync(password, 10);
+
+    await pool.query(
+      "INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
+      [name, email, hashedPassword]
+    );
+
     res.status(201).send("User registered successfully");
-  });
+  } catch (err) {
+    if (err.code === "ER_DUP_ENTRY")
+      return res.status(400).send("Email already exists");
+
+    res.status(500).json({ error: String(err) });
+  }
 });
 
+app.post("/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
 
-app.post("/login", (req, res) => {
-  const { email, password } = req.body;
+    if (!email || !password)
+      return res.status(400).send("All fields are required");
 
-  if (!email || !password)
-    return res.status(400).send("All fields are required");
+    const [rows] = await pool.query(
+      "SELECT * FROM users WHERE email = ?",
+      [email]
+    );
 
-  const q = "SELECT * FROM users WHERE email = ?";
-
-  db.query(q, [email], (err, data) => {
-    if (err) return res.status(500).json(err);
-
-    if (data.length === 0)
+    if (rows.length === 0)
       return res.status(404).send("User not found");
 
-    const isMatch = bcrypt.compareSync(password, data[0].password);
+    const isMatch = bcrypt.compareSync(password, rows[0].password);
 
     if (!isMatch)
       return res.status(401).send("Invalid password");
 
-    res.status(200).json({
-      id: data[0].id,
-      name: data[0].name,
-      email: data[0].email,
+    res.json({
+      id: rows[0].id,
+      name: rows[0].name,
+      email: rows[0].email,
     });
-  });
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
 });
 
+const PORT = Number(process.env.PORT || 5000);
+app.listen(PORT, () => {
+  console.log(`API running on port ${PORT}`);
+});

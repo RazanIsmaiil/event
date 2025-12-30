@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
-
+import { API } from "../config";
 const Login = () => {
   const [state, setState] = useState({
     email: "",
@@ -13,7 +13,7 @@ const Login = () => {
 
   const handleSubmit = () => {
     axios
-      .post("http://localhost:5000/login", state)
+      .post(`${API}/login`, state)
       .then((res) => {
         alert(`Welcome ${res.data.name}`);
         localStorage.setItem("user", JSON.stringify(res.data));

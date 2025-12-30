@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
-
+import { API } from "../config";
 const Signup = () => {
   const [state, setState] = useState({
     name: "",
@@ -14,7 +14,7 @@ const Signup = () => {
 
   const handleSubmit = () => {
     axios
-      .post("http://localhost:5000/signup", state)
+      .post(`${API}/signup`, state)
       .then(() => {
         alert("Signup successful");
         setState({ name: "", email: "", password: "" });

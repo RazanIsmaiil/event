@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import EventCard from "../components/EventCard";
-
+import { API } from "../config";
 const Events = () => {
 
   const [events, setEvents] = useState([]);
@@ -17,7 +17,7 @@ const Events = () => {
   
   useEffect(() => {
     axios
-      .get("http://localhost:5000/events")
+      .get(`${API}/events`)
       .then((res) => setEvents(res.data))
       .catch((err) => console.log(err));
   }, []);
@@ -34,7 +34,7 @@ const Events = () => {
     }
 
     axios
-      .post("http://localhost:5000/events", state)
+      .post(`${API}/events`, state)
       .then((res) => {
         alert("Event added successfully");
         setEvents([...events, { ...state, id: Math.random() }]); 
@@ -46,7 +46,7 @@ const Events = () => {
 
   const remove = (id) => {
     axios
-      .delete(`http://localhost:5000/events/${id}`)
+      .delete(`${API}/events/${id}`)
       .then(() => {
         setEvents(events.filter((item) => item.id !== id));
       })
